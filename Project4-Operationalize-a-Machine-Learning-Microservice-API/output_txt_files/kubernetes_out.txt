@@ -1,0 +1,15 @@
+<paste log output from Kubernetes-mediated prediction, here>
+Port: 8000
+{
+  "prediction": [
+    20.35373177134412
+  ]
+}
+duong@DUONGs-MacBook-Pro Udacity-Machine-Learning-Microservice-API % ./run_kubernetes.sh
+Error from server (AlreadyExists): pods "udacityapp" already exists
+NAME         READY   STATUS    RESTARTS   AGE
+udacityapp   1/1     Running   0          78s
+Forwarding from 0.0.0.0:8000 -> 80
+Handling connection for 8000
+Handling connection for 8000
+Handling connection for 8000

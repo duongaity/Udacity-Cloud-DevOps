@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eks-sample-app
+  # namespace: eks-sample-app
+  labels:
+    app: eks-sample-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eks-sample-app
+  template:
+    metadata:
+      labels:
+        app: eks-sample-app
+    spec:
+      # affinity:
+      #   nodeAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #       nodeSelectorTerms:
+      #       - matchExpressions:
+      #         - key: kubernetes.io/arch
+      #           operator: In
+      #           values:
+      #           - amd64
+      #           - arm64
+      containers:
+      - name: nginx
+        image: 346573986387.dkr.ecr.us-east-1.amazonaws.com/udacity_capstone:v1
+        ports:
+        - name: http
+          containerPort: 80
+        imagePullPolicy: Always
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: eks-sample-service
+  # namespace: eks-sample-app
+  labels:
+    app: eks-sample-app
+spec:
+  selector:
+    app: eks-sample-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer

@@ -1,0 +1,173 @@
+version: 2.1
+
+orbs:
+  aws-eks: circleci/aws-eks@2.2.0
+  aws-ecr: circleci/aws-ecr@8.1.2
+  slack: circleci/slack@4.9.3
+  kubernetes: circleci/kubernetes@1.3.0
+
+jobs:
+  build-frontend:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys: [frontend-build]
+      - run:
+          name: Build front-end
+          command: |
+            cd frontend
+            npm install
+            npm run build
+      - save_cache:
+          paths: [frontend/node_modules]
+          key: frontend-build
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+  
+  run-lint:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - run:
+          name: Install hadolint
+          command: |
+            sudo wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.16.3/hadolint-Linux-x86_64
+            sudo chmod +x /bin/hadolint
+      - run:
+          name: Run Lint
+          command: |
+            ls
+            hadolint Dockerfile --ignore DL3003
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  test-frontend:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys: [frontend-build]
+      - run:
+          name: Lint test
+          command: |
+            cd frontend
+            npm install
+            npm run test
+      - run:
+          name: Unit test
+          command: |
+            cd frontend
+            npm install
+            npm run lint
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  scan-frontend:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys: [frontend-build]
+      - run:
+          name: Scan frontend dependencies
+          command: |
+            cd frontend
+            npm audit --audit-level=critical --force
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  deploy-cluster:
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - aws-eks/create-cluster:
+          cluster-name: udacity-cluster-${CIRCLE_WORKFLOW_ID:0:7}
+          aws-region: ${AWS_DEFAULT_REGION}
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+   
+  deploy-kubernetes:
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - aws-eks/update-kubeconfig-with-authenticator:
+          install-kubectl: true
+          aws-region: ${AWS_DEFAULT_REGION}
+          cluster-name: udacity-cluster-${CIRCLE_WORKFLOW_ID:0:7}
+      - kubernetes/create-or-update-resource:
+          show-kubectl-command: true
+          resource-file-path: configs/deployment.yaml
+          resource-name: deployment/eks-sample-app
+          watch-timeout: 60m
+      - kubernetes/create-or-update-resource:
+          resource-file-path: "configs/deployment.yaml"
+          watch-timeout: 60m
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+  
+  deploy-application:
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - aws-eks/update-kubeconfig-with-authenticator:
+          install-kubectl: true
+          cluster-name: udacity-cluster-${CIRCLE_WORKFLOW_ID:0:7}
+          aws-region: ${AWS_DEFAULT_REGION}
+      - run:
+          name: Deploy application
+          command: |
+            kubectl get pods
+            kubectl get services
+      - slack/notify:
+          event: pass
+          template: basic_success_1
+
+workflows:
+  default:
+    jobs:
+      - build-frontend
+      - run-lint:
+          requires: [build-frontend]
+      - test-frontend:
+          requires: [build-frontend]
+      - scan-frontend:
+          requires: [build-frontend]
+      - aws-ecr/build-and-push-image:
+          name: push-image-to-ecr
+          registry-id: AWS_ECR_REGISTRY_ID
+          region: ${AWS_DEFAULT_REGION}
+          repo: udacity_capstone
+          tag: v1
+          requires: [run-lint, test-frontend, scan-frontend]
+          filters:
+            branches:
+              only: [master]
+      - deploy-cluster:
+          requires: [push-image-to-ecr]
+          filters:
+            branches:
+              only: [master]
+      - deploy-kubernetes:
+          requires: [deploy-cluster]
+          filters:
+            branches:
+              only: [master]
+      - deploy-application:
+          requires: [deploy-kubernetes]
+          filters:
+            branches:
+              only: [master]

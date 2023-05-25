@@ -1,0 +1,15 @@
+[URL01] GitHub repository
+https://github.com/duongaity/Udacity-Auto-Deploy-Project
+
+[URL02] FrontEnd
+http://udapeople-bde54d9.s3-website-us-east-1.amazonaws.com
+
+[URL03] BackEnd
+http://ec2-3-94-55-170.compute-1.amazonaws.com:3030/api/status
+
+[URL04] Prometheus
+http://54.175.194.113:9090/graph
+http://54.175.194.113:9090/targets
+
+[URL05] CloudFront
+http://d2ovni6uan7sfq.cloudfront.net
